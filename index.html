@@ -52,7 +52,7 @@
         const App = () => {
             const [view, setView] = useState('timer');
             const [waves, setWaves] = useState(() => {
-                const saved = localStorage.getItem('ssc7_waves_config_v6');
+                const saved = localStorage.getItem('ssc7_waves_config_v7');
                 return saved ? JSON.parse(saved) : [
                     { id: 1, name: 'Onda 1', duration: 30 * 60, startTime: '12:30' },
                     { id: 2, name: 'Onda 2', duration: 20 * 60, startTime: '13:00' },
@@ -69,41 +69,29 @@
             const [isRunning, setIsRunning] = useState(false);
             const [isMuted, setIsMuted] = useState(false);
             const [isAutoStartEnabled, setIsAutoStartEnabled] = useState(false);
+            const [isAutoNextEnabled, setIsAutoNextEnabled] = useState(false); // Novo Estado
             const [alarmTriggerMinutes, setAlarmTriggerMinutes] = useState(1);
             const [alarmRepeatSeconds, setAlarmRepeatSeconds] = useState(45);
             const [systemTime, setSystemTime] = useState("");
             
-            // --- Estados para Voz ---
             const [voices, setVoices] = useState([]);
             const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('ssc7_selected_voice') || "");
 
             const timerRef = useRef(null);
 
-            // Carregamento de Vozes com Pré-Seleção do Google Brasil
+            // Carregamento de Vozes
             useEffect(() => {
                 const loadVoices = () => {
                     const availableVoices = window.speechSynthesis.getVoices();
                     setVoices(availableVoices);
-                    
-                    // Lógica de Pré-Seleção:
-                    // 1. Tenta recuperar do localStorage (preferência do utilizador)
-                    // 2. Se não houver, procura especificamente por "Google português do Brasil"
-                    // 3. Se não encontrar, procura qualquer uma que contenha "pt-BR"
-                    // 4. Se ainda assim nada, usa a primeira disponível
                     if (!localStorage.getItem('ssc7_selected_voice') && availableVoices.length > 0) {
                         const googleBrasil = availableVoices.find(v => v.name === "Google português do Brasil");
                         const anyBrasil = availableVoices.find(v => v.lang.includes('pt-BR'));
-                        
-                        if (googleBrasil) {
-                            setSelectedVoiceName(googleBrasil.name);
-                        } else if (anyBrasil) {
-                            setSelectedVoiceName(anyBrasil.name);
-                        } else {
-                            setSelectedVoiceName(availableVoices[0].name);
-                        }
+                        if (googleBrasil) setSelectedVoiceName(googleBrasil.name);
+                        else if (anyBrasil) setSelectedVoiceName(anyBrasil.name);
+                        else setSelectedVoiceName(availableVoices[0].name);
                     }
                 };
-
                 loadVoices();
                 if (window.speechSynthesis.onvoiceschanged !== undefined) {
                     window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -111,9 +99,7 @@
             }, []);
 
             useEffect(() => {
-                if (selectedVoiceName) {
-                    localStorage.setItem('ssc7_selected_voice', selectedVoiceName);
-                }
+                if (selectedVoiceName) localStorage.setItem('ssc7_selected_voice', selectedVoiceName);
             }, [selectedVoiceName]);
 
             const addMinutesToTime = (timeStr, mins) => {
@@ -126,31 +112,24 @@
             useEffect(() => {
                 const updatedWaves = [...waves];
                 let changed = false;
-
                 for (let i = 1; i < updatedWaves.length; i++) {
                     const prevWave = updatedWaves[i - 1];
-                    const durationInMinutes = prevWave.duration / 60;
-                    const nextStartTime = addMinutesToTime(prevWave.startTime, durationInMinutes);
-                    
+                    const nextStartTime = addMinutesToTime(prevWave.startTime, prevWave.duration / 60);
                     if (updatedWaves[i].startTime !== nextStartTime) {
                         updatedWaves[i].startTime = nextStartTime;
                         changed = true;
                     }
                 }
-
-                if (changed) {
-                    setWaves(updatedWaves);
-                }
+                if (changed) setWaves(updatedWaves);
             }, [waves[0].startTime, waves.map(w => w.duration).join(',')]);
 
             useEffect(() => {
-                localStorage.setItem('ssc7_waves_config_v6', JSON.stringify(waves));
+                localStorage.setItem('ssc7_waves_config_v7', JSON.stringify(waves));
             }, [waves]);
 
             const playHorn = useCallback(() => {
                 if (isMuted) return;
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                
                 const playTone = (freq, startTime, duration) => {
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
@@ -164,11 +143,8 @@
                     osc.start(startTime);
                     osc.stop(startTime + duration);
                 };
-
-                // Ding-Dong Estilo Aeroporto Lento
                 playTone(554.37, audioCtx.currentTime, 0.9);
                 playTone(440.00, audioCtx.currentTime + 0.7, 0.9);
-                
                 setTimeout(() => audioCtx.close(), 3000);
             }, [isMuted]);
 
@@ -176,89 +152,78 @@
                 if (isMuted) return;
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
-                
                 const voice = voices.find(v => v.name === selectedVoiceName);
-                if (voice) {
-                    utterance.voice = voice;
-                } else {
-                    utterance.lang = 'pt-BR';
-                }
-                
+                if (voice) utterance.voice = voice;
+                else utterance.lang = 'pt-BR';
                 window.speechSynthesis.speak(utterance);
             }, [isMuted, voices, selectedVoiceName]);
 
             const triggerManualAlert = () => {
                 const minsRestantes = Math.floor(timeLeft / 60);
-                const nomeOnda = waves[activeWaveIndex].name;
                 playHorn();
-                setTimeout(() => {
-                    speak(`Atenção equipe, para a ${nomeOnda} restam ${minsRestantes} minutos.`);
-                }, 1600);
+                setTimeout(() => speak(`Atenção equipe, para a ${waves[activeWaveIndex].name} restam ${minsRestantes} minutos.`), 1600);
             };
 
+            // Relógio e Autostart
             useEffect(() => {
                 const interval = setInterval(() => {
                     const now = new Date();
                     const currentTimeStr = now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
                     setSystemTime(currentTimeStr);
-
                     if (isAutoStartEnabled && !isRunning && activeWaveIndex === 0 && timeLeft === waves[0].duration) {
-                        if (currentTimeStr === waves[0].startTime) {
-                            toggleTimer(true);
-                        }
+                        if (currentTimeStr === waves[0].startTime) toggleTimer(true);
                     }
                 }, 1000);
                 return () => clearInterval(interval);
-            }, [isAutoStartEnabled, isRunning, activeWaveIndex, timeLeft, waves[0].startTime]);
+            }, [isAutoStartEnabled, isRunning, activeWaveIndex, timeLeft, waves]);
 
+            // Lógica Central do Timer e Troca Automática
             useEffect(() => {
                 if (isRunning && timeLeft > 0) {
                     timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
                 } else if (timeLeft === 0 && isRunning) {
-                    setIsRunning(false);
+                    clearInterval(timerRef.current);
                     playHorn();
                     speak(`${waves[activeWaveIndex].name} finalizada.`);
-                    clearInterval(timerRef.current);
+
+                    if (isAutoNextEnabled && activeWaveIndex < waves.length - 1) {
+                        // Aguarda 5 segundos antes de trocar para a próxima
+                        setTimeout(() => {
+                            const next = activeWaveIndex + 1;
+                            setActiveWaveIndex(next);
+                            setTimeLeft(waves[next].duration);
+                            playHorn();
+                            setTimeout(() => speak(`Atenção equipe, vai iniciar a ${waves[next].name}`), 1600);
+                        }, 5000);
+                    } else {
+                        setIsRunning(false);
+                    }
                 }
                 return () => clearInterval(timerRef.current);
-            }, [isRunning, timeLeft, activeWaveIndex]);
+            }, [isRunning, timeLeft, activeWaveIndex, isAutoNextEnabled, waves]);
 
+            // Alertas Dinâmicos
             useEffect(() => {
                 if (!isRunning) return;
-                const totalDuration = waves[activeWaveIndex].duration;
-                const halfTime = Math.floor(totalDuration / 2);
-
+                const halfTime = Math.floor(waves[activeWaveIndex].duration / 2);
                 if (timeLeft === halfTime) {
-                    const minsRestantes = Math.floor(timeLeft / 60);
-                    const nomeOnda = waves[activeWaveIndex].name;
                     playHorn();
-                    setTimeout(() => {
-                        speak(`${nomeOnda} já se passou metade do tempo, restam ${minsRestantes} minutos.`);
-                    }, 1600);
+                    setTimeout(() => speak(`${waves[activeWaveIndex].name} já se passou metade do tempo, restam ${Math.floor(timeLeft / 60)} minutos.`), 1600);
                 }
-
                 const triggerSecs = alarmTriggerMinutes * 60;
                 if (timeLeft <= triggerSecs && timeLeft > 0 && timeLeft % alarmRepeatSeconds === 0 && timeLeft !== halfTime) {
                     playHorn();
-                    setTimeout(() => {
-                        speak(`Atenção, faltam ${Math.floor(timeLeft / 60)} minutos para o fim da onda.`);
-                    }, 1600);
+                    setTimeout(() => speak(`Atenção, faltam ${Math.floor(timeLeft / 60)} minutos para o fim da onda.`), 1600);
                 }
             }, [timeLeft, isRunning]);
 
-            const formatTime = (s) => {
-                const mins = Math.floor(s / 60).toString().padStart(2, '0');
-                const secs = (s % 60).toString().padStart(2, '0');
-                return `${mins}:${secs}`;
-            };
+            const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
             const toggleTimer = (forceStart = false) => {
                 const willStart = forceStart || !isRunning;
                 if (willStart && timeLeft === waves[activeWaveIndex].duration) {
                     playHorn();
-                    setTimeout(() => {
-                        speak(`Atenção equipe, vai iniciar a ${waves[activeWaveIndex].name}`);
-                    }, 1600);
+                    setTimeout(() => speak(`Atenção equipe, vai iniciar a ${waves[activeWaveIndex].name}`), 1600);
                 }
                 setIsRunning(willStart);
             };
@@ -274,15 +239,9 @@
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-2 bg-white/50 px-3 py-1 rounded-lg text-[10px] font-bold text-slate-700">
-                                <Icons.Clock /> {systemTime}
-                            </div>
-                            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/50 text-slate-800'}`}>
-                                {isMuted ? <Icons.VolumeX /> : <Icons.Volume2 />}
-                            </button>
-                            <button onClick={() => setView(view === 'timer' ? 'setup' : 'timer')} className="bg-white/50 hover:bg-white p-2 rounded-lg transition-all text-slate-800">
-                                <Icons.Settings />
-                            </button>
+                            <div className="hidden md:flex items-center gap-2 bg-white/50 px-3 py-1 rounded-lg text-[10px] font-bold text-slate-700"><Icons.Clock /> {systemTime}</div>
+                            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/50 text-slate-800'}`}>{isMuted ? <Icons.VolumeX /> : <Icons.Volume2 />}</button>
+                            <button onClick={() => setView(view === 'timer' ? 'setup' : 'timer')} className="bg-white/50 hover:bg-white p-2 rounded-lg transition-all text-slate-800"><Icons.Settings /></button>
                         </div>
                     </header>
 
@@ -290,28 +249,19 @@
                         <div className="flex-1 flex flex-col gap-6">
                             <div className="ml-card rounded-2xl p-10 md:p-16 text-center border border-slate-200 relative overflow-hidden flex-1 flex flex-col justify-center">
                                 <div className="mb-4 flex flex-col items-center gap-2">
-                                    <span className={`px-5 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] border ${timeLeft < 60 ? 'bg-red-500 text-white border-red-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                                        {waves[activeWaveIndex].name} • {isRunning ? 'Em Execução' : 'Pausado'}
-                                    </span>
-                                    {isAutoStartEnabled && activeWaveIndex === 0 && !isRunning && (
-                                        <span className="text-[10px] font-bold text-ml-blue uppercase animate-pulse">
-                                            Aguarda Início Auto às {waves[0].startTime}
-                                        </span>
-                                    )}
+                                    <span className={`px-5 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] border ${timeLeft < 60 ? 'bg-red-500 text-white border-red-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{waves[activeWaveIndex].name} • {isRunning ? 'Em Execução' : 'Pausado'}</span>
+                                    {isAutoStartEnabled && activeWaveIndex === 0 && !isRunning && <span className="text-[10px] font-bold text-ml-blue uppercase animate-pulse">Aguarda Início Auto às {waves[0].startTime}</span>}
+                                    {isAutoNextEnabled && isRunning && <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">● Troca Automática Ativa</span>}
                                 </div>
-                                <div className={`text-9xl md:text-[14rem] font-mono font-black tabular-nums tracking-tighter leading-none my-6 transition-colors duration-500 ${timeLeft < 60 ? 'text-red-500 animate-alert' : 'text-slate-900'}`}>
-                                    {formatTime(timeLeft)}
-                                </div>
+                                <div className={`text-9xl md:text-[14rem] font-mono font-black tabular-nums tracking-tighter leading-none my-6 transition-colors duration-500 ${timeLeft < 60 ? 'text-red-500 animate-alert' : 'text-slate-900'}`}>{formatTime(timeLeft)}</div>
                                 <div className="max-w-xl mx-auto w-full h-4 bg-slate-100 rounded-full mb-12 overflow-hidden p-1 border border-slate-200 shadow-inner">
                                     <div className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-red-500' : 'bg-ml-blue'}`} style={{ width: `${(1 - timeLeft / waves[activeWaveIndex].duration) * 100}%` }}></div>
                                 </div>
                                 <div className="flex flex-wrap justify-center gap-4">
-                                    <button onClick={() => {setIsRunning(false); setTimeLeft(waves[activeWaveIndex].duration)}} className="p-5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-all border border-slate-300 active:scale-95"><Icons.RotateCcw /></button>
+                                    <button onClick={() => {setIsRunning(false); setTimeLeft(waves[activeWaveIndex].duration)}} className="p-5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 active:scale-95"><Icons.RotateCcw /></button>
                                     <button onClick={triggerManualAlert} className="p-5 rounded-xl bg-blue-50 text-ml-blue hover:bg-blue-100 border border-blue-200 active:scale-95 flex items-center gap-2"><Icons.Bullhorn /><span className="hidden md:inline font-bold text-xs uppercase">Alerta Manual</span></button>
                                     <button onClick={() => toggleTimer()} className={`px-16 py-5 rounded-xl font-black text-2xl flex items-center gap-4 shadow-lg transition-all transform active:scale-95 ${isRunning ? 'bg-slate-800 text-white' : 'bg-ml-yellow text-slate-900'}`}>{isRunning ? <><Icons.Pause /> Pausar</> : <><Icons.Play /> Iniciar</>}</button>
-                                    {timeLeft === 0 && activeWaveIndex < waves.length - 1 && (
-                                        <button onClick={() => { const next = activeWaveIndex + 1; setActiveWaveIndex(next); setTimeLeft(waves[next].duration); speak(`Iniciando a ${waves[next].name}`); }} className="px-10 py-5 rounded-xl bg-ml-blue text-white font-black text-xl hover:brightness-110 shadow-lg animate-bounce">Próxima Onda</button>
-                                    )}
+                                    {timeLeft === 0 && activeWaveIndex < waves.length - 1 && <button onClick={() => { const next = activeWaveIndex + 1; setActiveWaveIndex(next); setTimeLeft(waves[next].duration); toggleTimer(true); }} className="px-10 py-5 rounded-xl bg-ml-blue text-white font-black text-xl hover:brightness-110 shadow-lg animate-bounce">Próxima Onda</button>}
                                 </div>
                                 <div className="absolute -bottom-10 -right-10 opacity-5 rotate-12 pointer-events-none"><Icons.Package size={300} /></div>
                             </div>
@@ -327,50 +277,34 @@
                         </div>
                     ) : (
                         <div className="ml-card p-8 rounded-2xl border border-slate-200">
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-2xl font-black uppercase tracking-tight">Configurações</h2>
-                                <button onClick={() => setView('timer')} className="text-slate-500 font-bold hover:text-slate-800 underline">Voltar</button>
-                            </div>
+                            <div className="flex items-center justify-between mb-8"><h2 className="text-2xl font-black uppercase tracking-tight">Configurações</h2><button onClick={() => setView('timer')} className="text-slate-500 font-bold hover:text-slate-800 underline">Voltar</button></div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
                                     <h3 className="font-black text-slate-400 uppercase text-xs tracking-widest border-b pb-2">Tempos e Horários</h3>
                                     <div className="space-y-3">
                                         {waves.map((w, i) => (
                                             <div key={w.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-700 text-sm">{w.name}</span>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <input type="number" value={w.duration/60} onChange={(e) => { const newWaves = [...waves]; const val = Number(e.target.value); newWaves[i].duration = val * 60; setWaves(newWaves); if (i === activeWaveIndex) setTimeLeft(val * 60); }} className="w-16 p-1 rounded border-2 border-slate-200 text-center font-black text-xs" />
-                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">min</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end">
-                                                    {i === 0 ? (
-                                                        <input type="time" value={w.startTime} onChange={(e) => { const newWaves = [...waves]; newWaves[0].startTime = e.target.value; setWaves(newWaves); }} className="p-2 rounded-lg border-2 border-ml-blue outline-none font-black text-sm" />
-                                                    ) : (
-                                                        <span className="text-xs font-black text-slate-400 bg-slate-200 px-3 py-2 rounded-lg border-2 border-transparent">{w.startTime}</span>
-                                                    )}
-                                                </div>
+                                                <div className="flex flex-col"><span className="font-bold text-slate-700 text-sm">{w.name}</span><div className="flex items-center gap-2 mt-1"><input type="number" value={w.duration/60} onChange={(e) => { const newWaves = [...waves]; const val = Number(e.target.value); newWaves[i].duration = val * 60; setWaves(newWaves); if (i === activeWaveIndex) setTimeLeft(val * 60); }} className="w-16 p-1 rounded border-2 border-slate-200 text-center font-black text-xs" /><span className="text-[9px] font-bold text-slate-400 uppercase">min</span></div></div>
+                                                <div className="flex flex-col items-end">{i === 0 ? <input type="time" value={w.startTime} onChange={(e) => { const newWaves = [...waves]; newWaves[0].startTime = e.target.value; setWaves(newWaves); }} className="p-2 rounded-lg border-2 border-ml-blue outline-none font-black text-sm" /> : <span className="text-xs font-black text-slate-400 bg-slate-200 px-3 py-2 rounded-lg border-2 border-transparent">{w.startTime}</span>}</div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="space-y-6">
-                                    <h3 className="font-black text-slate-400 uppercase text-xs tracking-widest border-b pb-2">Automatização, Voz e Alertas</h3>
+                                    <h3 className="font-black text-slate-400 uppercase text-xs tracking-widest border-b pb-2">Automatização e Voz</h3>
                                     <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 space-y-6">
-                                        <div className="space-y-2">
-                                            <label className="block text-[10px] font-black uppercase text-slate-500">Seletor de Voz:</label>
-                                            <select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-3 rounded-lg border-2 border-slate-200 focus:border-ml-blue outline-none font-bold text-xs bg-white">
-                                                {voices.length === 0 && <option>A carregar vozes...</option>}
-                                                {voices.map((voice) => (
-                                                    <option key={voice.name} value={voice.name}>{voice.name} ({voice.lang})</option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                        <div className="space-y-2"><label className="block text-[10px] font-black uppercase text-slate-500">Seletor de Voz:</label><select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-3 rounded-lg border-2 border-slate-200 focus:border-ml-blue outline-none font-bold text-xs bg-white">{voices.map((voice) => (<option key={voice.name} value={voice.name}>{voice.name} ({voice.lang})</option>))}</select></div>
+                                        
                                         <div className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-ml-blue/10">
-                                            <div className="flex flex-col"><span className="font-black text-slate-700 text-sm uppercase italic">Execução Automática</span></div>
-                                            <button onClick={() => setIsAutoStartEnabled(!isAutoStartEnabled)} className={`w-14 h-7 rounded-full transition-all relative shadow-inner ${isAutoStartEnabled ? 'bg-ml-blue' : 'bg-slate-300'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all shadow-md ${isAutoStartEnabled ? 'right-1' : 'left-1'}`}></div></button>
+                                            <div className="flex flex-col"><span className="font-black text-slate-700 text-sm uppercase italic">Início Auto (Dia)</span><span className="text-[9px] text-slate-500">Onda 1 na hora marcada</span></div>
+                                            <button onClick={() => setIsAutoStartEnabled(!isAutoStartEnabled)} className={`w-12 h-6 rounded-full transition-all relative ${isAutoStartEnabled ? 'bg-ml-blue' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isAutoStartEnabled ? 'right-1' : 'left-1'}`}></div></button>
                                         </div>
+
+                                        <div className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-green-600/10">
+                                            <div className="flex flex-col"><span className="font-black text-slate-700 text-sm uppercase italic">Troca Automática</span><span className="text-[9px] text-slate-500">Passa para a próxima onda sozinho</span></div>
+                                            <button onClick={() => setIsAutoNextEnabled(!isAutoNextEnabled)} className={`w-12 h-6 rounded-full transition-all relative ${isAutoNextEnabled ? 'bg-green-600' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isAutoNextEnabled ? 'right-1' : 'left-1'}`}></div></button>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-4">
                                             <div><label className="block text-[9px] font-black uppercase text-slate-500 mb-1">Alerta Final (Min):</label><input type="number" value={alarmTriggerMinutes} onChange={(e) => setAlarmTriggerMinutes(Number(e.target.value))} className="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-sm" /></div>
                                             <div><label className="block text-[9px] font-black uppercase text-slate-500 mb-1">Repetir Alerta (Seg):</label><input type="number" value={alarmRepeatSeconds} onChange={(e) => setAlarmRepeatSeconds(Number(e.target.value))} className="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-sm" /></div>
