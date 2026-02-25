@@ -3,56 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Ondas SSC7 - ML Style</title>
-    <!-- Bibliotecas via CDN -->
+    <title>SSC7 Wave Manager - Service Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@700&display=swap');
+        
+        :root {
+            --ml-yellow: #FFE600;
+            --ml-blue: #3483FA;
+            --ml-gray: #EBEBEB;
+            --ml-dark: #333333;
+        }
+
         body { 
             font-family: 'Inter', sans-serif; 
-            background-color: #EBEBEB; /* Cinzento Mercado Livre */
-            color: #333;
+            background-color: var(--ml-gray);
+            color: var(--ml-dark);
+            overflow-x: hidden;
         }
-        .ml-card {
-            background-color: #FFFFFF;
-            box-shadow: 0 1px 2px 0 rgba(0,0,0,.1);
+
+        .ml-shadow { box-shadow: 0 1px 2px 0 rgba(0,0,0,.1); }
+        .font-mono-timer { font-family: 'JetBrains Mono', monospace; }
+
+        @keyframes pulse-alert {
+            0%, 100% { transform: scale(1); opacity: 1; color: #ef4444; }
+            50% { transform: scale(1.03); opacity: 0.9; color: #b91c1c; }
         }
-        .bg-ml-yellow { background-color: #FFE600; }
-        .bg-ml-blue { background-color: #3483FA; }
-        .text-ml-blue { color: #3483FA; }
+        .animate-alert { animation: pulse-alert 0.8s infinite; }
+
+        .progress-transition { transition: width 1s linear; }
         
-        @keyframes pulse-red {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.02); opacity: 0.8; }
-        }
-        .animate-alert { animation: pulse-red 1s infinite; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useRef } = React;
+        const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
         const Icons = {
-            Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
-            Pause: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
-            RotateCcw: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
-            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-            Package: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
-            Volume2: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>,
-            VolumeX: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>,
-            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-            Bullhorn: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2V15H6L11 19V5Z"/><path d="M19.07 4.93C20.94 6.81 22 9.33 22 12C22 14.67 20.94 17.19 19.07 19.07"/><path d="M15.54 8.46C16.47 9.4 17 10.66 17 12C17 13.34 16.47 14.6 15.54 15.54"/></svg>,
+            Play: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+            Pause: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
+            Reset: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+            Settings: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+            Mute: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>,
+            Unmute: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>,
+            Horn: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2V15H6L11 19V5Z"/><path d="M19.07 4.93C20.94 6.81 22 9.33 22 12C22 14.67 20.94 17.19 19.07 19.07"/></svg>,
+            Package: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
         };
 
         const App = () => {
             const [view, setView] = useState('timer');
             const [waves, setWaves] = useState(() => {
-                const saved = localStorage.getItem('ssc7_waves_config_v7');
+                const saved = localStorage.getItem('ssc7_waves_config_v9');
                 return saved ? JSON.parse(saved) : [
                     { id: 1, name: 'Onda 1', duration: 30 * 60, startTime: '12:30' },
                     { id: 2, name: 'Onda 2', duration: 20 * 60, startTime: '13:00' },
@@ -64,258 +73,298 @@
                 ];
             });
 
-            const [activeWaveIndex, setActiveWaveIndex] = useState(0);
+            const [activeIdx, setActiveIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(waves[0].duration);
             const [isRunning, setIsRunning] = useState(false);
-            const [isMuted, setIsMuted] = useState(false);
-            const [isAutoStartEnabled, setIsAutoStartEnabled] = useState(false);
-            const [isAutoNextEnabled, setIsAutoNextEnabled] = useState(false); // Novo Estado
-            const [alarmTriggerMinutes, setAlarmTriggerMinutes] = useState(1);
-            const [alarmRepeatSeconds, setAlarmRepeatSeconds] = useState(45);
-            const [systemTime, setSystemTime] = useState("");
             
-            const [voices, setVoices] = useState([]);
-            const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('ssc7_selected_voice') || "");
+            const [isMuted, setIsMuted] = useState(() => JSON.parse(localStorage.getItem('ssc7_mute')) || false);
+            const [autoStart, setAutoStart] = useState(() => {
+                const s = localStorage.getItem('ssc7_autostart');
+                return s !== null ? JSON.parse(s) : true;
+            });
+            const [autoNext, setAutoNext] = useState(() => {
+                const s = localStorage.getItem('ssc7_autonext');
+                return s !== null ? JSON.parse(s) : true;
+            });
+            const [triggerMin, setTriggerMin] = useState(() => Number(localStorage.getItem('ssc7_triggermin')) || 1);
+            const [repeatSec, setRepeatSec] = useState(() => Number(localStorage.getItem('ssc7_repeatsec')) || 45);
+            const [selectedVoiceName, setSelectedVoiceName] = useState(() => localStorage.getItem('ssc7_voice') || "");
 
+            const [systemTime, setSystemTime] = useState("");
+            const [voices, setVoices] = useState([]);
             const timerRef = useRef(null);
 
-            // Carregamento de Vozes
-            useEffect(() => {
-                const loadVoices = () => {
-                    const availableVoices = window.speechSynthesis.getVoices();
-                    setVoices(availableVoices);
-                    if (!localStorage.getItem('ssc7_selected_voice') && availableVoices.length > 0) {
-                        const googleBrasil = availableVoices.find(v => v.name === "Google português do Brasil");
-                        const anyBrasil = availableVoices.find(v => v.lang.includes('pt-BR'));
-                        if (googleBrasil) setSelectedVoiceName(googleBrasil.name);
-                        else if (anyBrasil) setSelectedVoiceName(anyBrasil.name);
-                        else setSelectedVoiceName(availableVoices[0].name);
-                    }
-                };
-                loadVoices();
-                if (window.speechSynthesis.onvoiceschanged !== undefined) {
-                    window.speechSynthesis.onvoiceschanged = loadVoices;
-                }
-            }, []);
+            const formatTime = (s) => {
+                const m = Math.floor(s / 60);
+                const rs = s % 60;
+                return `${m.toString().padStart(2, '0')}:${rs.toString().padStart(2, '0')}`;
+            };
 
-            useEffect(() => {
-                if (selectedVoiceName) localStorage.setItem('ssc7_selected_voice', selectedVoiceName);
-            }, [selectedVoiceName]);
-
-            const addMinutesToTime = (timeStr, mins) => {
-                const [hours, minutes] = timeStr.split(':').map(Number);
-                const date = new Date();
-                date.setHours(hours, minutes + Math.floor(mins), (mins % 1) * 60);
-                return date.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+            const calculateStartTime = (baseTime, minutesToAdd) => {
+                const [h, m] = baseTime.split(':').map(Number);
+                const d = new Date();
+                d.setHours(h, m + minutesToAdd, 0);
+                return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
             };
 
             useEffect(() => {
-                const updatedWaves = [...waves];
+                localStorage.setItem('ssc7_waves_config_v9', JSON.stringify(waves));
+                localStorage.setItem('ssc7_mute', isMuted);
+                localStorage.setItem('ssc7_autostart', autoStart);
+                localStorage.setItem('ssc7_autonext', autoNext);
+                localStorage.setItem('ssc7_triggermin', triggerMin);
+                localStorage.setItem('ssc7_repeatsec', repeatSec);
+                localStorage.setItem('ssc7_voice', selectedVoiceName);
+            }, [waves, isMuted, autoStart, autoNext, triggerMin, repeatSec, selectedVoiceName]);
+
+            useEffect(() => {
+                const updated = [...waves];
                 let changed = false;
-                for (let i = 1; i < updatedWaves.length; i++) {
-                    const prevWave = updatedWaves[i - 1];
-                    const nextStartTime = addMinutesToTime(prevWave.startTime, prevWave.duration / 60);
-                    if (updatedWaves[i].startTime !== nextStartTime) {
-                        updatedWaves[i].startTime = nextStartTime;
+                let currentTotalMinutes = 0;
+                for (let i = 1; i < updated.length; i++) {
+                    currentTotalMinutes += updated[i-1].duration / 60;
+                    const expectedStart = calculateStartTime(updated[0].startTime, currentTotalMinutes);
+                    if (updated[i].startTime !== expectedStart) {
+                        updated[i].startTime = expectedStart;
                         changed = true;
                     }
                 }
-                if (changed) setWaves(updatedWaves);
+                if (changed) setWaves(updated);
             }, [waves[0].startTime, waves.map(w => w.duration).join(',')]);
 
             useEffect(() => {
-                localStorage.setItem('ssc7_waves_config_v7', JSON.stringify(waves));
-            }, [waves]);
+                const load = () => {
+                    const av = window.speechSynthesis.getVoices();
+                    setVoices(av);
+                    if (!selectedVoiceName && av.length > 0) {
+                        const pref = av.find(v => v.lang.includes('pt-BR') || v.lang.includes('pt-PT')) || av[0];
+                        setSelectedVoiceName(pref.name);
+                    }
+                };
+                load();
+                window.speechSynthesis.onvoiceschanged = load;
+            }, []);
 
             const playHorn = useCallback(() => {
                 if (isMuted) return;
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const playTone = (freq, startTime, duration) => {
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const playTone = (freq, start, dur) => {
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
                     osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(freq, startTime);
-                    gain.gain.setValueAtTime(0, startTime);
-                    gain.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
-                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start(startTime);
-                    osc.stop(startTime + duration);
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+                    g.gain.setValueAtTime(0, ctx.currentTime + start);
+                    g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + start + 0.05);
+                    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+                    osc.connect(g); g.connect(ctx.destination);
+                    osc.start(ctx.currentTime + start);
+                    osc.stop(ctx.currentTime + start + dur);
                 };
-                playTone(554.37, audioCtx.currentTime, 0.9);
-                playTone(440.00, audioCtx.currentTime + 0.7, 0.9);
-                setTimeout(() => audioCtx.close(), 3000);
+                playTone(587.33, 0, 0.8);
+                playTone(440.00, 0.6, 0.8);
+                setTimeout(() => ctx.close(), 2500);
             }, [isMuted]);
 
             const speak = useCallback((text) => {
                 if (isMuted) return;
                 window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                const voice = voices.find(v => v.name === selectedVoiceName);
-                if (voice) utterance.voice = voice;
-                else utterance.lang = 'pt-BR';
-                window.speechSynthesis.speak(utterance);
+                const u = new SpeechSynthesisUtterance(text);
+                const v = voices.find(v => v.name === selectedVoiceName);
+                if (v) u.voice = v;
+                u.rate = 1.1;
+                window.speechSynthesis.speak(u);
             }, [isMuted, voices, selectedVoiceName]);
 
-            const triggerManualAlert = () => {
-                const minsRestantes = Math.floor(timeLeft / 60);
-                playHorn();
-                setTimeout(() => speak(`Atenção equipe, para a ${waves[activeWaveIndex].name} restam ${minsRestantes} minutos.`), 1600);
-            };
-
-            // Relógio e Autostart
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    const now = new Date();
-                    const currentTimeStr = now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-                    setSystemTime(currentTimeStr);
-                    if (isAutoStartEnabled && !isRunning && activeWaveIndex === 0 && timeLeft === waves[0].duration) {
-                        if (currentTimeStr === waves[0].startTime) toggleTimer(true);
-                    }
-                }, 1000);
-                return () => clearInterval(interval);
-            }, [isAutoStartEnabled, isRunning, activeWaveIndex, timeLeft, waves]);
-
-            // Lógica Central do Timer e Troca Automática
             useEffect(() => {
                 if (isRunning && timeLeft > 0) {
-                    timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+                    timerRef.current = setInterval(() => setTimeLeft(p => p - 1), 1000);
                 } else if (timeLeft === 0 && isRunning) {
                     clearInterval(timerRef.current);
                     playHorn();
-                    speak(`${waves[activeWaveIndex].name} finalizada.`);
-
-                    if (isAutoNextEnabled && activeWaveIndex < waves.length - 1) {
-                        // Aguarda 5 segundos antes de trocar para a próxima
+                    speak(`${waves[activeIdx].name} finalizada.`);
+                    if (autoNext && activeIdx < waves.length - 1) {
                         setTimeout(() => {
-                            const next = activeWaveIndex + 1;
-                            setActiveWaveIndex(next);
+                            const next = activeIdx + 1;
+                            setActiveIdx(next);
                             setTimeLeft(waves[next].duration);
                             playHorn();
-                            setTimeout(() => speak(`Atenção equipe, vai iniciar a ${waves[next].name}`), 1600);
+                            setTimeout(() => speak(`Iniciando a ${waves[next].name}.`), 1500);
                         }, 5000);
                     } else {
                         setIsRunning(false);
                     }
                 }
                 return () => clearInterval(timerRef.current);
-            }, [isRunning, timeLeft, activeWaveIndex, isAutoNextEnabled, waves]);
+            }, [isRunning, timeLeft, activeIdx, autoNext, waves]);
 
-            // Alertas Dinâmicos
             useEffect(() => {
                 if (!isRunning) return;
-                const halfTime = Math.floor(waves[activeWaveIndex].duration / 2);
-                if (timeLeft === halfTime) {
+                const half = Math.floor(waves[activeIdx].duration / 2);
+                if (timeLeft === half) {
                     playHorn();
-                    setTimeout(() => speak(`${waves[activeWaveIndex].name} já se passou metade do tempo, restam ${Math.floor(timeLeft / 60)} minutos.`), 1600);
+                    setTimeout(() => speak(`${waves[activeIdx].name}: Metade do tempo concluída. Restam ${Math.floor(timeLeft/60)} minutos.`), 1500);
                 }
-                const triggerSecs = alarmTriggerMinutes * 60;
-                if (timeLeft <= triggerSecs && timeLeft > 0 && timeLeft % alarmRepeatSeconds === 0 && timeLeft !== halfTime) {
+                const triggerSecs = triggerMin * 60;
+                if (timeLeft <= triggerSecs && timeLeft > 0 && timeLeft % repeatSec === 0 && timeLeft !== half) {
                     playHorn();
-                    setTimeout(() => speak(`Atenção, faltam ${Math.floor(timeLeft / 60)} minutos para o fim da onda.`), 1600);
+                    setTimeout(() => speak(`Atenção equipe, restam ${Math.floor(timeLeft/60)} minutos para o fim da onda.`), 1500);
                 }
             }, [timeLeft, isRunning]);
 
-            const formatTime = (s) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+            useEffect(() => {
+                const tick = setInterval(() => {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                    setSystemTime(timeStr);
+                    if (autoStart && !isRunning && activeIdx === 0 && timeLeft === waves[0].duration) {
+                        if (timeStr === waves[0].startTime) toggleTimer(true);
+                    }
+                }, 1000);
+                return () => clearInterval(tick);
+            }, [autoStart, isRunning, activeIdx, timeLeft, waves]);
 
             const toggleTimer = (forceStart = false) => {
-                const willStart = forceStart || !isRunning;
-                if (willStart && timeLeft === waves[activeWaveIndex].duration) {
+                const start = forceStart || !isRunning;
+                if (start && timeLeft === waves[activeIdx].duration) {
                     playHorn();
-                    setTimeout(() => speak(`Atenção equipe, vai iniciar a ${waves[activeWaveIndex].name}`), 1600);
+                    setTimeout(() => speak(`Atenção time, vai começar a Expedição. Iniciando a ${waves[activeIdx].name}. Boa operação a todos.`), 1500);
                 }
-                setIsRunning(willStart);
+                setIsRunning(start);
             };
 
+            const manualAlert = () => {
+                playHorn();
+                const m = Math.floor(timeLeft / 60);
+                setTimeout(() => speak(`Atenção time, para a ${waves[activeIdx].name} restam ${m} minutos.`), 1500);
+            };
+
+            const totalDailySeconds = useMemo(() => waves.reduce((acc, curr) => acc + curr.duration, 0), [waves]);
+            const completedSeconds = useMemo(() => {
+                let completed = 0;
+                for(let i = 0; i < activeIdx; i++) completed += waves[i].duration;
+                completed += (waves[activeIdx].duration - timeLeft);
+                return completed;
+            }, [activeIdx, timeLeft, waves]);
+
             return (
-                <div className="p-4 md:p-8 max-w-6xl mx-auto min-h-screen flex flex-col">
-                    <header className="flex justify-between items-center mb-6 bg-ml-yellow p-4 rounded-xl ml-card border-b-2 border-yellow-400">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-white p-2 rounded-lg text-ml-blue shadow-sm"><Icons.Package /></div>
+                <div className="max-w-5xl mx-auto p-4 md:p-6 min-h-screen flex flex-col">
+                    <header className="bg-[#FFE600] rounded-2xl p-4 md:p-6 mb-6 flex justify-between items-center ml-shadow border-b-4 border-[#E2CC00]">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-white p-3 rounded-xl text-[#3483FA] shadow-sm"><Icons.Package /></div>
                             <div>
-                                <h1 className="font-black text-xl tracking-tight uppercase italic leading-none">Gestor de Ondas SSC7</h1>
-                                <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mt-1">Lages, SC • Operação ML</p>
+                                <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase leading-none">Gestor de Ondas SSC7</h1>
+                                <p className="text-[11px] font-black text-[#333333] uppercase tracking-[0.2em] mt-1 opacity-80">Lages, SC • Service Center</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-2 bg-white/50 px-3 py-1 rounded-lg text-[10px] font-bold text-slate-700"><Icons.Clock /> {systemTime}</div>
-                            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-lg transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/50 text-slate-800'}`}>{isMuted ? <Icons.VolumeX /> : <Icons.Volume2 />}</button>
-                            <button onClick={() => setView(view === 'timer' ? 'setup' : 'timer')} className="bg-white/50 hover:bg-white p-2 rounded-lg transition-all text-slate-800"><Icons.Settings /></button>
+                        <div className="flex items-center gap-3 md:gap-8">
+                            {/* RELÓGIO PRINCIPAL COM TAMANHO MAXIMIZADO */}
+                            <div className="flex items-center gap-4 bg-white/70 px-6 py-3 rounded-2xl ml-shadow border-2 border-white/50">
+                                <span className="w-3 h-3 rounded-full bg-green-600 animate-pulse"></span>
+                                <span className="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter font-mono-timer leading-none">{systemTime}</span>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2">
+                                <button onClick={() => setIsMuted(!isMuted)} className={`p-3 rounded-xl transition-all ${isMuted ? 'bg-red-500 text-white shadow-inner' : 'bg-white/60 text-slate-800 hover:bg-white'}`}>
+                                    {isMuted ? <Icons.Mute /> : <Icons.Unmute />}
+                                </button>
+                                <button onClick={() => setView(view === 'timer' ? 'setup' : 'timer')} className="bg-white/60 hover:bg-white p-3 rounded-xl transition-all text-slate-800 ml-shadow">
+                                    <Icons.Settings />
+                                </button>
+                            </div>
                         </div>
                     </header>
 
                     {view === 'timer' ? (
-                        <div className="flex-1 flex flex-col gap-6">
-                            <div className="ml-card rounded-2xl p-10 md:p-16 text-center border border-slate-200 relative overflow-hidden flex-1 flex flex-col justify-center">
-                                <div className="mb-4 flex flex-col items-center gap-2">
-                                    <span className={`px-5 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] border ${timeLeft < 60 ? 'bg-red-500 text-white border-red-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{waves[activeWaveIndex].name} • {isRunning ? 'Em Execução' : 'Pausado'}</span>
-                                    {isAutoStartEnabled && activeWaveIndex === 0 && !isRunning && <span className="text-[10px] font-bold text-ml-blue uppercase animate-pulse">Aguarda Início Auto às {waves[0].startTime}</span>}
-                                    {isAutoNextEnabled && isRunning && <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">● Troca Automática Ativa</span>}
+                        <main className="flex-1 flex flex-col gap-6 animate-in fade-in duration-500">
+                            <div className="bg-white rounded-xl p-3 ml-shadow border border-slate-200">
+                                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-1.5 px-1">
+                                    <span>Progresso Diário</span>
+                                    <span>{Math.round((completedSeconds / totalDailySeconds) * 100)}%</span>
                                 </div>
-                                <div className={`text-9xl md:text-[14rem] font-mono font-black tabular-nums tracking-tighter leading-none my-6 transition-colors duration-500 ${timeLeft < 60 ? 'text-red-500 animate-alert' : 'text-slate-900'}`}>{formatTime(timeLeft)}</div>
-                                <div className="max-w-xl mx-auto w-full h-4 bg-slate-100 rounded-full mb-12 overflow-hidden p-1 border border-slate-200 shadow-inner">
-                                    <div className={`h-full rounded-full transition-all duration-1000 ${timeLeft < 60 ? 'bg-red-500' : 'bg-ml-blue'}`} style={{ width: `${(1 - timeLeft / waves[activeWaveIndex].duration) * 100}%` }}></div>
+                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-green-500 progress-transition" style={{ width: `${(completedSeconds / totalDailySeconds) * 100}%` }}></div>
                                 </div>
-                                <div className="flex flex-wrap justify-center gap-4">
-                                    <button onClick={() => {setIsRunning(false); setTimeLeft(waves[activeWaveIndex].duration)}} className="p-5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 active:scale-95"><Icons.RotateCcw /></button>
-                                    <button onClick={triggerManualAlert} className="p-5 rounded-xl bg-blue-50 text-ml-blue hover:bg-blue-100 border border-blue-200 active:scale-95 flex items-center gap-2"><Icons.Bullhorn /><span className="hidden md:inline font-bold text-xs uppercase">Alerta Manual</span></button>
-                                    <button onClick={() => toggleTimer()} className={`px-16 py-5 rounded-xl font-black text-2xl flex items-center gap-4 shadow-lg transition-all transform active:scale-95 ${isRunning ? 'bg-slate-800 text-white' : 'bg-ml-yellow text-slate-900'}`}>{isRunning ? <><Icons.Pause /> Pausar</> : <><Icons.Play /> Iniciar</>}</button>
-                                    {timeLeft === 0 && activeWaveIndex < waves.length - 1 && <button onClick={() => { const next = activeWaveIndex + 1; setActiveWaveIndex(next); setTimeLeft(waves[next].duration); toggleTimer(true); }} className="px-10 py-5 rounded-xl bg-ml-blue text-white font-black text-xl hover:brightness-110 shadow-lg animate-bounce">Próxima Onda</button>}
-                                </div>
-                                <div className="absolute -bottom-10 -right-10 opacity-5 rotate-12 pointer-events-none"><Icons.Package size={300} /></div>
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                                {waves.map((w, i) => (
-                                    <div key={w.id} className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${i === activeWaveIndex ? 'border-ml-blue bg-white shadow-md scale-105 z-10' : i < activeWaveIndex ? 'border-transparent bg-slate-200 opacity-40 grayscale' : 'border-transparent bg-white/50 opacity-70 hover:opacity-100'}`} onClick={() => { if (!isRunning) { setActiveWaveIndex(i); setTimeLeft(w.duration); } }}>
-                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">{w.startTime}</p>
-                                        <p className="font-bold text-slate-800 text-sm">{w.name}</p>
-                                        <p className="text-xs text-ml-blue font-black uppercase tracking-tighter">{Math.floor(w.duration / 60)} MIN</p>
+
+                            <div className="bg-white rounded-3xl p-8 md:p-14 text-center border border-slate-200 ml-shadow relative overflow-hidden flex-1 flex flex-col justify-center">
+                                <div className="mb-6 flex flex-col items-center gap-3">
+                                    <div className="flex flex-col items-center">
+                                        <span className={`px-10 py-4 rounded-3xl text-4xl md:text-6xl font-black uppercase tracking-tight border-4 transition-all shadow-xl ${timeLeft < 60 ? 'bg-red-600 text-white border-red-700' : 'bg-[#333333] text-white border-slate-700'}`}>
+                                            {waves[activeIdx].name}
+                                        </span>
+                                        <span className="mt-4 px-5 py-1.5 rounded-full text-[13px] font-black uppercase tracking-[0.2em] bg-slate-100 text-slate-500 border border-slate-200 shadow-sm">
+                                            {isRunning ? 'Operação em Curso' : 'Operação Pausada'}
+                                        </span>
                                     </div>
+                                    {autoStart && activeIdx === 0 && !isRunning && timeLeft === waves[0].duration && (
+                                        <div className="text-[11px] font-black text-[#3483FA] animate-pulse uppercase tracking-tight mt-2">Próximo início: {waves[0].startTime}</div>
+                                    )}
+                                </div>
+
+                                <div className={`font-mono-timer text-8xl md:text-[13rem] font-bold tabular-nums tracking-tighter leading-none transition-all duration-300 ${timeLeft < 60 ? 'animate-alert' : 'text-slate-900'}`}>
+                                    {formatTime(timeLeft)}
+                                </div>
+
+                                <div className="max-w-md mx-auto w-full h-3 bg-slate-100 rounded-full my-10 overflow-hidden border border-slate-200 shadow-inner">
+                                    <div className={`h-full rounded-full progress-transition ${timeLeft < 60 ? 'bg-red-500' : 'bg-[#3483FA]'}`} style={{ width: `${(1 - timeLeft / waves[activeIdx].duration) * 100}%` }}></div>
+                                </div>
+
+                                <div className="flex flex-wrap justify-center items-center gap-4 z-10">
+                                    <button onClick={() => { setIsRunning(false); setTimeLeft(waves[activeIdx].duration); }} className="p-5 rounded-2xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-100 text-slate-400 active:scale-95 transition-all" title="Reiniciar"><Icons.Reset /></button>
+                                    <button onClick={manualAlert} className="p-5 rounded-2xl bg-blue-50 text-[#3483FA] hover:bg-blue-100 border-2 border-blue-100 active:scale-95 transition-all flex items-center gap-2"><Icons.Horn /><span className="hidden md:inline font-black text-xs uppercase tracking-widest">Alerta Manual</span></button>
+                                    <button onClick={() => toggleTimer()} className={`px-14 py-5 rounded-2xl font-black text-2xl flex items-center gap-4 shadow-xl transition-all transform active:scale-95 ${isRunning ? 'bg-slate-800 text-white' : 'bg-[#FFE600] text-slate-900'}`}>{isRunning ? <><Icons.Pause /> Pausar</> : <><Icons.Play /> Iniciar</>}</button>
+                                    {timeLeft === 0 && activeIdx < waves.length - 1 && (
+                                        <button onClick={() => { const n = activeIdx + 1; setActiveIdx(n); setTimeLeft(waves[n].duration); toggleTimer(true); }} className="px-8 py-5 rounded-2xl bg-green-500 text-white font-black text-lg hover:brightness-110 shadow-lg animate-bounce transition-all">Próxima Onda</button>
+                                    )}
+                                </div>
+
+                                <div className="absolute -bottom-16 -right-16 opacity-[0.03] rotate-12 pointer-events-none"><Icons.Package size={400} /></div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 pb-6">
+                                {waves.map((w, i) => (
+                                    <button key={w.id} disabled={isRunning} onClick={() => { setActiveIdx(i); setTimeLeft(w.duration); }} className={`p-4 rounded-2xl border-2 text-left transition-all ${i === activeIdx ? 'border-[#3483FA] bg-white shadow-lg ring-4 ring-blue-50 scale-105 z-10' : i < activeIdx ? 'border-transparent bg-slate-200 opacity-40 grayscale' : 'border-transparent bg-white/70 hover:bg-white hover:shadow-md'} ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                        <p className="text-[9px] font-black uppercase text-slate-400 mb-1">{w.startTime}</p>
+                                        <p className="font-bold text-slate-800 text-sm truncate">{w.name}</p>
+                                        <p className={`text-[10px] font-black uppercase tracking-tighter ${i === activeIdx ? 'text-[#3483FA]' : 'text-slate-400'}`}>{Math.floor(w.duration / 60)} MIN</p>
+                                    </button>
                                 ))}
                             </div>
-                        </div>
+                        </main>
                     ) : (
-                        <div className="ml-card p-8 rounded-2xl border border-slate-200">
-                            <div className="flex items-center justify-between mb-8"><h2 className="text-2xl font-black uppercase tracking-tight">Configurações</h2><button onClick={() => setView('timer')} className="text-slate-500 font-bold hover:text-slate-800 underline">Voltar</button></div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
-                                    <h3 className="font-black text-slate-400 uppercase text-xs tracking-widest border-b pb-2">Tempos e Horários</h3>
-                                    <div className="space-y-3">
+                        <div className="bg-white p-6 md:p-10 rounded-3xl border border-slate-200 ml-shadow animate-in slide-in-from-bottom-4 duration-500">
+                            <div className="flex items-center justify-between mb-10"><h2 className="text-2xl font-black uppercase tracking-tighter">Ajustes Operacionais</h2><button onClick={() => setView('timer')} className="bg-slate-100 hover:bg-slate-200 px-6 py-2 rounded-xl text-slate-600 font-black uppercase text-xs transition-all">Sair</button></div>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-[#3483FA] rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Cronograma de Ondas</h3></div>
+                                    <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
                                         {waves.map((w, i) => (
-                                            <div key={w.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                                <div className="flex flex-col"><span className="font-bold text-slate-700 text-sm">{w.name}</span><div className="flex items-center gap-2 mt-1"><input type="number" value={w.duration/60} onChange={(e) => { const newWaves = [...waves]; const val = Number(e.target.value); newWaves[i].duration = val * 60; setWaves(newWaves); if (i === activeWaveIndex) setTimeLeft(val * 60); }} className="w-16 p-1 rounded border-2 border-slate-200 text-center font-black text-xs" /><span className="text-[9px] font-bold text-slate-400 uppercase">min</span></div></div>
-                                                <div className="flex flex-col items-end">{i === 0 ? <input type="time" value={w.startTime} onChange={(e) => { const newWaves = [...waves]; newWaves[0].startTime = e.target.value; setWaves(newWaves); }} className="p-2 rounded-lg border-2 border-ml-blue outline-none font-black text-sm" /> : <span className="text-xs font-black text-slate-400 bg-slate-200 px-3 py-2 rounded-lg border-2 border-transparent">{w.startTime}</span>}</div>
+                                            <div key={w.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-300 transition-all">
+                                                <div className="flex flex-col gap-2"><span className="font-bold text-slate-700 text-sm">{w.name}</span><div className="flex items-center gap-2"><input type="number" value={w.duration/60} onChange={(e) => { const n = [...waves]; const v = Math.max(1, Number(e.target.value)); n[i].duration = v * 60; setWaves(n); if (i === activeIdx) setTimeLeft(v * 60); }} className="w-16 p-2 rounded-lg border-2 border-slate-200 focus:border-[#3483FA] outline-none font-black text-xs text-center" /><span className="text-[9px] font-black text-slate-400 uppercase">Minutos</span></div></div>
+                                                <div className="flex flex-col items-end">{i === 0 ? <input type="time" value={w.startTime} onChange={(e) => { const n = [...waves]; n[0].startTime = e.target.value; setWaves(n); }} className="p-2.5 rounded-xl border-2 border-[#3483FA] outline-none font-black text-sm bg-white shadow-sm" /> : <div className="px-4 py-2 bg-slate-200 rounded-xl text-xs font-black text-slate-500 border border-slate-300">{w.startTime}</div>}<span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Início Previsto</span></div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="space-y-6">
-                                    <h3 className="font-black text-slate-400 uppercase text-xs tracking-widest border-b pb-2">Automatização e Voz</h3>
-                                    <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 space-y-6">
-                                        <div className="space-y-2"><label className="block text-[10px] font-black uppercase text-slate-500">Seletor de Voz:</label><select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-3 rounded-lg border-2 border-slate-200 focus:border-ml-blue outline-none font-bold text-xs bg-white">{voices.map((voice) => (<option key={voice.name} value={voice.name}>{voice.name} ({voice.lang})</option>))}</select></div>
-                                        
-                                        <div className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-ml-blue/10">
-                                            <div className="flex flex-col"><span className="font-black text-slate-700 text-sm uppercase italic">Início Auto (Dia)</span><span className="text-[9px] text-slate-500">Onda 1 na hora marcada</span></div>
-                                            <button onClick={() => setIsAutoStartEnabled(!isAutoStartEnabled)} className={`w-12 h-6 rounded-full transition-all relative ${isAutoStartEnabled ? 'bg-ml-blue' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isAutoStartEnabled ? 'right-1' : 'left-1'}`}></div></button>
+                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-[#FFE600] rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Automação e Avisos</h3></div>
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-8">
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500 px-1">Voz do Sistema</label><select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-[#3483FA] outline-none font-bold text-sm bg-white shadow-sm transition-all">{voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}</select></div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <button onClick={() => setAutoStart(!autoStart)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${autoStart ? 'bg-white border-[#3483FA]' : 'bg-white border-slate-200 opacity-60'}`}><div className="text-left"><p className="font-black text-xs uppercase italic leading-none">Início Auto</p><p className="text-[9px] text-slate-400 mt-1">Ao bater {waves[0].startTime}</p></div><div className={`w-10 h-5 rounded-full relative transition-all ${autoStart ? 'bg-[#3483FA]' : 'bg-slate-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoStart ? 'right-1' : 'left-1'}`}></div></div></button>
+                                            <button onClick={() => setAutoNext(!autoNext)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${autoNext ? 'bg-white border-green-500' : 'bg-white border-slate-200 opacity-60'}`}><div className="text-left"><p className="font-black text-xs uppercase italic leading-none">Próxima Auto</p><p className="text-[9px] text-slate-400 mt-1">Transição fluida</p></div><div className={`w-10 h-5 rounded-full relative transition-all ${autoNext ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoNext ? 'right-1' : 'left-1'}`}></div></div></button>
                                         </div>
-
-                                        <div className="flex items-center justify-between p-4 bg-white rounded-xl border-2 border-green-600/10">
-                                            <div className="flex flex-col"><span className="font-black text-slate-700 text-sm uppercase italic">Troca Automática</span><span className="text-[9px] text-slate-500">Passa para a próxima onda sozinho</span></div>
-                                            <button onClick={() => setIsAutoNextEnabled(!isAutoNextEnabled)} className={`w-12 h-6 rounded-full transition-all relative ${isAutoNextEnabled ? 'bg-green-600' : 'bg-slate-300'}`}><div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isAutoNextEnabled ? 'right-1' : 'left-1'}`}></div></button>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div><label className="block text-[9px] font-black uppercase text-slate-500 mb-1">Alerta Final (Min):</label><input type="number" value={alarmTriggerMinutes} onChange={(e) => setAlarmTriggerMinutes(Number(e.target.value))} className="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-sm" /></div>
-                                            <div><label className="block text-[9px] font-black uppercase text-slate-500 mb-1">Repetir Alerta (Seg):</label><input type="number" value={alarmRepeatSeconds} onChange={(e) => setAlarmRepeatSeconds(Number(e.target.value))} className="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-sm" /></div>
+                                        <div className="grid grid-cols-2 gap-4 pt-4">
+                                            <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-500">Aviso Final (Min)</label><input type="number" value={triggerMin} onChange={(e) => setTriggerMin(Number(e.target.value))} className="w-full p-3 rounded-xl border-2 border-slate-200 font-bold" /></div>
+                                            <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-500">Repetição (Seg)</label><input type="number" value={repeatSec} onChange={(e) => setRepeatSec(Number(e.target.value))} className="w-full p-3 rounded-xl border-2 border-slate-200 font-bold" /></div>
                                         </div>
                                     </div>
-                                    <button onClick={() => setView('timer')} className="w-full bg-ml-blue text-white p-5 rounded-xl font-black uppercase shadow-lg text-xl">Confirmar Ajustes</button>
+                                    <button onClick={() => setView('timer')} className="w-full bg-[#3483FA] text-white py-5 rounded-2xl font-black uppercase shadow-xl hover:brightness-110 active:scale-[0.98] transition-all text-lg">Confirmar Alterações</button>
                                 </div>
                             </div>
                         </div>
                     )}
-                    <footer className="mt-8 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] pb-4">Sistema de Gestão Logística SSC7 • Mercado Livre Style</footer>
+                    <footer className="mt-8 text-center pb-8"><p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] opacity-60">Sistema de Gestão SSC7 • Service Center Lages • Created by Lemuel Bueno </p></footer>
                 </div>
             );
         };
