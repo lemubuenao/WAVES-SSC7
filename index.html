@@ -8,6 +8,20 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        // Configuração do Tailwind para reconhecer as cores do Mercado Livre
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                'ml-blue': '#3483FA',
+                'ml-yellow': '#FFE600',
+                'ml-yellow-dark': '#E2CC00',
+              }
+            }
+          }
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@700&display=swap');
         
@@ -56,12 +70,13 @@
             Unmute: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>,
             Horn: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2V15H6L11 19V5Z"/><path d="M19.07 4.93C20.94 6.81 22 9.33 22 12C22 14.67 20.94 17.19 19.07 19.07"/></svg>,
             Package: () => <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
+            Mic: () => <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
         };
 
         const App = () => {
             const [view, setView] = useState('timer');
             const [waves, setWaves] = useState(() => {
-                const saved = localStorage.getItem('ssc7_waves_config_v10');
+                const saved = localStorage.getItem('ssc7_waves_config_v11');
                 return saved ? JSON.parse(saved) : [
                     { id: 1, name: 'Onda 1', duration: 30 * 60, startTime: '12:30' },
                     { id: 2, name: 'Onda 2', duration: 20 * 60, startTime: '13:00' },
@@ -76,6 +91,7 @@
             const [activeIdx, setActiveIdx] = useState(0);
             const [timeLeft, setTimeLeft] = useState(waves[0].duration);
             const [isRunning, setIsRunning] = useState(false);
+            const [customAnnouncement, setCustomAnnouncement] = useState("");
             
             const [isMuted, setIsMuted] = useState(() => JSON.parse(localStorage.getItem('ssc7_mute')) || false);
             const [autoStart, setAutoStart] = useState(() => {
@@ -108,7 +124,7 @@
             };
 
             useEffect(() => {
-                localStorage.setItem('ssc7_waves_config_v10', JSON.stringify(waves));
+                localStorage.setItem('ssc7_waves_config_v11', JSON.stringify(waves));
                 localStorage.setItem('ssc7_mute', isMuted);
                 localStorage.setItem('ssc7_autostart', autoStart);
                 localStorage.setItem('ssc7_autonext', autoNext);
@@ -166,7 +182,7 @@
             }, [isMuted]);
 
             const speak = useCallback((text) => {
-                if (isMuted) return;
+                if (isMuted || !text) return;
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(text);
                 const v = voices.find(v => v.name === selectedVoiceName);
@@ -238,6 +254,12 @@
                 setTimeout(() => speak(`Atenção time, para a ${waves[activeIdx].name} restam ${m} minutos.`), 1500);
             };
 
+            const handleCustomAnnouncement = () => {
+                if (customAnnouncement.trim()) {
+                    speak(customAnnouncement);
+                }
+            };
+
             const totalDailySeconds = useMemo(() => waves.reduce((acc, curr) => acc + curr.duration, 0), [waves]);
             const completedSeconds = useMemo(() => {
                 let completed = 0;
@@ -248,16 +270,15 @@
 
             return (
                 <div className="max-w-[98%] mx-auto p-4 md:p-6 min-h-screen flex flex-col">
-                    <header className="bg-[#FFE600] rounded-2xl p-4 md:p-8 mb-6 flex justify-between items-center ml-shadow border-b-4 border-[#E2CC00]">
+                    <header className="bg-ml-yellow rounded-2xl p-4 md:p-8 mb-6 flex justify-between items-center ml-shadow border-b-4 border-ml-yellow-dark">
                         <div className="flex-1 flex items-center gap-6">
-                            <div className="bg-white p-4 rounded-2xl text-[#3483FA] shadow-sm"><Icons.Package /></div>
+                            <div className="bg-white p-4 rounded-2xl text-ml-blue shadow-sm"><Icons.Package /></div>
                             <div>
                                 <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter uppercase leading-none">Gestor de Ondas • SSC7</h1>
                                 <p className="text-[12px] font-black text-[#333333] uppercase tracking-[0.2em] mt-1.5 opacity-80">Lages, SC • Service Center</p>
                             </div>
                         </div>
 
-                        {/* LOGOTIPO CENTRALIZADO */}
                         <div className="flex justify-center flex-1">
                             <img 
                                 src="https://logodownload.org/wp-content/uploads/2016/08/mercado-livre-logo-8.png" 
@@ -268,7 +289,6 @@
                         </div>
 
                         <div className="flex-1 flex justify-end items-center gap-4 md:gap-10">
-                            {/* RELÓGIO PRINCIPAL MAXIMIZADO */}
                             <div className="flex items-center gap-6 bg-white/80 px-8 py-4 rounded-3xl ml-shadow border-2 border-white/60">
                                 <span className="w-4 h-4 rounded-full bg-green-600 animate-pulse"></span>
                                 <span className="text-6xl md:text-9xl font-black text-slate-900 tracking-tighter font-mono-timer leading-none tabular-nums">{systemTime}</span>
@@ -308,7 +328,7 @@
                                         </span>
                                     </div>
                                     {autoStart && activeIdx === 0 && !isRunning && timeLeft === waves[0].duration && (
-                                        <div className="text-[11px] font-black text-[#3483FA] animate-pulse uppercase tracking-tight mt-2">Próximo início: {waves[0].startTime}</div>
+                                        <div className="text-[11px] font-black text-ml-blue animate-pulse uppercase tracking-tight mt-2">Próximo início: {waves[0].startTime}</div>
                                     )}
                                 </div>
 
@@ -317,16 +337,35 @@
                                 </div>
 
                                 <div className="max-w-md mx-auto w-full h-3 bg-slate-100 rounded-full my-10 overflow-hidden border border-slate-200 shadow-inner">
-                                    <div className={`h-full rounded-full progress-transition ${timeLeft < 60 ? 'bg-red-500' : 'bg-[#3483FA]'}`} style={{ width: `${(1 - timeLeft / waves[activeIdx].duration) * 100}%` }}></div>
+                                    <div className={`h-full rounded-full progress-transition ${timeLeft < 60 ? 'bg-red-500' : 'bg-ml-blue'}`} style={{ width: `${(1 - timeLeft / waves[activeIdx].duration) * 100}%` }}></div>
                                 </div>
 
-                                <div className="flex flex-wrap justify-center items-center gap-4 z-10">
+                                <div className="flex flex-wrap justify-center items-center gap-4 z-10 mb-8">
                                     <button onClick={() => { setIsRunning(false); setTimeLeft(waves[activeIdx].duration); }} className="p-5 rounded-2xl bg-slate-50 hover:bg-slate-100 border-2 border-slate-100 text-slate-400 active:scale-95 transition-all" title="Reiniciar"><Icons.Reset /></button>
-                                    <button onClick={manualAlert} className="p-5 rounded-2xl bg-blue-50 text-[#3483FA] hover:bg-blue-100 border-2 border-blue-100 active:scale-95 transition-all flex items-center gap-2"><Icons.Horn /><span className="hidden md:inline font-black text-xs uppercase tracking-widest">Alerta Manual</span></button>
-                                    <button onClick={() => toggleTimer()} className={`px-14 py-5 rounded-2xl font-black text-2xl flex items-center gap-4 shadow-xl transition-all transform active:scale-95 ${isRunning ? 'bg-slate-800 text-white' : 'bg-[#FFE600] text-slate-900'}`}>{isRunning ? <><Icons.Pause /> Pausar</> : <><Icons.Play /> Iniciar</>}</button>
+                                    <button onClick={manualAlert} className="p-5 rounded-2xl bg-blue-50 text-ml-blue hover:bg-blue-100 border-2 border-blue-100 active:scale-95 transition-all flex items-center gap-2"><Icons.Horn /><span className="hidden md:inline font-black text-xs uppercase tracking-widest">Alerta Manual</span></button>
+                                    <button onClick={() => toggleTimer()} className={`px-14 py-5 rounded-2xl font-black text-2xl flex items-center gap-4 shadow-xl transition-all transform active:scale-95 ${isRunning ? 'bg-slate-800 text-white' : 'bg-ml-yellow text-slate-900'}`}>{isRunning ? <><Icons.Pause /> Pausar</> : <><Icons.Play /> Iniciar</>}</button>
                                     {timeLeft === 0 && activeIdx < waves.length - 1 && (
                                         <button onClick={() => { const n = activeIdx + 1; setActiveIdx(n); setTimeLeft(waves[n].duration); toggleTimer(true); }} className="px-8 py-5 rounded-2xl bg-green-500 text-white font-black text-lg hover:brightness-110 shadow-lg animate-bounce transition-all">Próxima Onda</button>
                                     )}
+                                </div>
+
+                                <div className="max-w-2xl mx-auto w-full bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 flex gap-3 items-center ml-shadow">
+                                    <div className="text-ml-blue"><Icons.Mic /></div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Escreva um comunicado para a voz falar..." 
+                                        className="flex-1 bg-transparent border-none outline-none font-bold text-slate-600 placeholder:text-slate-300 px-2"
+                                        value={customAnnouncement}
+                                        onChange={(e) => setCustomAnnouncement(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCustomAnnouncement()}
+                                    />
+                                    <button 
+                                        onClick={handleCustomAnnouncement}
+                                        disabled={!customAnnouncement.trim()}
+                                        className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${customAnnouncement.trim() ? 'bg-ml-blue text-white shadow-md active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                                    >
+                                        Falar Agora
+                                    </button>
                                 </div>
 
                                 <div className="absolute -bottom-16 -right-16 opacity-[0.03] rotate-12 pointer-events-none"><Icons.Package size={400} /></div>
@@ -334,10 +373,10 @@
 
                             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 pb-6">
                                 {waves.map((w, i) => (
-                                    <button key={w.id} disabled={isRunning} onClick={() => { setActiveIdx(i); setTimeLeft(w.duration); }} className={`p-4 rounded-2xl border-2 text-left transition-all ${i === activeIdx ? 'border-[#3483FA] bg-white shadow-lg ring-4 ring-blue-50 scale-105 z-10' : i < activeIdx ? 'border-transparent bg-slate-200 opacity-40 grayscale' : 'border-transparent bg-white/70 hover:bg-white hover:shadow-md'} ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                    <button key={w.id} disabled={isRunning} onClick={() => { setActiveIdx(i); setTimeLeft(w.duration); }} className={`p-4 rounded-2xl border-2 text-left transition-all ${i === activeIdx ? 'border-ml-blue bg-white shadow-lg ring-4 ring-blue-50 scale-105 z-10' : i < activeIdx ? 'border-transparent bg-slate-200 opacity-40 grayscale' : 'border-transparent bg-white/70 hover:bg-white hover:shadow-md'} ${isRunning ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                         <p className="text-[9px] font-black uppercase text-slate-400 mb-1">{w.startTime}</p>
                                         <p className="font-bold text-slate-800 text-sm truncate">{w.name}</p>
-                                        <p className={`text-[10px] font-black uppercase tracking-tighter ${i === activeIdx ? 'text-[#3483FA]' : 'text-slate-400'}`}>{Math.floor(w.duration / 60)} MIN</p>
+                                        <p className={`text-[10px] font-black uppercase tracking-tighter ${i === activeIdx ? 'text-ml-blue' : 'text-slate-400'}`}>{Math.floor(w.duration / 60)} MIN</p>
                                     </button>
                                 ))}
                             </div>
@@ -347,22 +386,22 @@
                             <div className="flex items-center justify-between mb-10"><h2 className="text-2xl font-black uppercase tracking-tighter">Ajustes Operacionais</h2><button onClick={() => setView('timer')} className="bg-slate-100 hover:bg-slate-200 px-6 py-2 rounded-xl text-slate-600 font-black uppercase text-xs transition-all">Sair</button></div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                 <div className="space-y-6">
-                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-[#3483FA] rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Cronograma de Ondas</h3></div>
+                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-ml-blue rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Cronograma de Ondas</h3></div>
                                     <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
                                         {waves.map((w, i) => (
                                             <div key={w.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-300 transition-all">
-                                                <div className="flex flex-col gap-2"><span className="font-bold text-slate-700 text-sm">{w.name}</span><div className="flex items-center gap-2"><input type="number" value={w.duration/60} onChange={(e) => { const n = [...waves]; const v = Math.max(1, Number(e.target.value)); n[i].duration = v * 60; setWaves(n); if (i === activeIdx) setTimeLeft(v * 60); }} className="w-16 p-2 rounded-lg border-2 border-slate-200 focus:border-[#3483FA] outline-none font-black text-xs text-center" /><span className="text-[9px] font-black text-slate-400 uppercase">Minutos</span></div></div>
-                                                <div className="flex flex-col items-end">{i === 0 ? <input type="time" value={w.startTime} onChange={(e) => { const n = [...waves]; n[0].startTime = e.target.value; setWaves(n); }} className="p-2.5 rounded-xl border-2 border-[#3483FA] outline-none font-black text-sm bg-white shadow-sm" /> : <div className="px-4 py-2 bg-slate-200 rounded-xl text-xs font-black text-slate-500 border border-slate-300">{w.startTime}</div>}<span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Início Previsto</span></div>
+                                                <div className="flex flex-col gap-2"><span className="font-bold text-slate-700 text-sm">{w.name}</span><div className="flex items-center gap-2"><input type="number" value={w.duration/60} onChange={(e) => { const n = [...waves]; const v = Math.max(1, Number(e.target.value)); n[i].duration = v * 60; setWaves(n); if (i === activeIdx) setTimeLeft(v * 60); }} className="w-16 p-2 rounded-lg border-2 border-slate-200 focus:border-ml-blue outline-none font-black text-xs text-center" /><span className="text-[9px] font-black text-slate-400 uppercase">Minutos</span></div></div>
+                                                <div className="flex flex-col items-end">{i === 0 ? <input type="time" value={w.startTime} onChange={(e) => { const n = [...waves]; n[0].startTime = e.target.value; setWaves(n); }} className="p-2.5 rounded-xl border-2 border-ml-blue outline-none font-black text-sm bg-white shadow-sm" /> : <div className="px-4 py-2 bg-slate-200 rounded-xl text-xs font-black text-slate-500 border border-slate-300">{w.startTime}</div>}<span className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Início Previsto</span></div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="space-y-6">
-                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-[#FFE600] rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Automação e Avisos</h3></div>
+                                    <div className="flex items-center gap-2 border-b pb-4"><div className="w-2 h-6 bg-ml-yellow rounded-full"></div><h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Automação e Avisos</h3></div>
                                     <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-8">
-                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500 px-1">Voz do Sistema</label><select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-[#3483FA] outline-none font-bold text-sm bg-white shadow-sm transition-all">{voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}</select></div>
+                                        <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500 px-1">Voz do Sistema</label><select value={selectedVoiceName} onChange={(e) => setSelectedVoiceName(e.target.value)} className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-ml-blue outline-none font-bold text-sm bg-white shadow-sm transition-all">{voices.map(v => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}</select></div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <button onClick={() => setAutoStart(!autoStart)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${autoStart ? 'bg-white border-[#3483FA]' : 'bg-white border-slate-200 opacity-60'}`}><div className="text-left"><p className="font-black text-xs uppercase italic leading-none">Início Auto</p><p className="text-[9px] text-slate-400 mt-1">Ao bater {waves[0].startTime}</p></div><div className={`w-10 h-5 rounded-full relative transition-all ${autoStart ? 'bg-[#3483FA]' : 'bg-slate-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoStart ? 'right-1' : 'left-1'}`}></div></div></button>
+                                            <button onClick={() => setAutoStart(!autoStart)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${autoStart ? 'bg-white border-ml-blue' : 'bg-white border-slate-200 opacity-60'}`}><div className="text-left"><p className="font-black text-xs uppercase italic leading-none">Início Auto</p><p className="text-[9px] text-slate-400 mt-1">Ao bater {waves[0].startTime}</p></div><div className={`w-10 h-5 rounded-full relative transition-all ${autoStart ? 'bg-ml-blue' : 'bg-slate-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoStart ? 'right-1' : 'left-1'}`}></div></div></button>
                                             <button onClick={() => setAutoNext(!autoNext)} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${autoNext ? 'bg-white border-green-500' : 'bg-white border-slate-200 opacity-60'}`}><div className="text-left"><p className="font-black text-xs uppercase italic leading-none">Próxima Auto</p><p className="text-[9px] text-slate-400 mt-1">Transição fluida</p></div><div className={`w-10 h-5 rounded-full relative transition-all ${autoNext ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${autoNext ? 'right-1' : 'left-1'}`}></div></div></button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4 pt-4">
@@ -370,7 +409,7 @@
                                             <div className="space-y-2"><label className="text-[9px] font-black uppercase text-slate-500">Repetição (Seg)</label><input type="number" value={repeatSec} onChange={(e) => setRepeatSec(Number(e.target.value))} className="w-full p-3 rounded-xl border-2 border-slate-200 font-bold" /></div>
                                         </div>
                                     </div>
-                                    <button onClick={() => setView('timer')} className="w-full bg-[#3483FA] text-white py-5 rounded-2xl font-black uppercase shadow-xl hover:brightness-110 active:scale-[0.98] transition-all text-lg">Confirmar Alterações</button>
+                                    <button onClick={() => setView('timer')} className="w-full bg-ml-blue text-white py-5 rounded-2xl font-black uppercase shadow-xl hover:brightness-110 active:scale-[0.98] transition-all text-lg">Confirmar Alterações</button>
                                 </div>
                             </div>
                         </div>
